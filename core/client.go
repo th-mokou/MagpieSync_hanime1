@@ -208,7 +208,11 @@ func (c *Client) Playlists(ctx context.Context) ([]Playlist, error) {
 	if err != nil {
 		return nil, err
 	}
-	return parsePlaylists(body, c.baseURL), nil
+	playlists := parsePlaylists(body, c.baseURL)
+	if len(playlists) == 0 && !recognizedPlaylistsPage(body) {
+		return nil, errors.New("hanime1: playlist page structure not recognized")
+	}
+	return playlists, nil
 }
 
 func (c *Client) PlaylistPage(ctx context.Context, list string, page int) (Page, error) {
@@ -264,6 +268,12 @@ func recognizedListPage(body string) bool {
 		strings.Contains(body, "playlist-video-list")
 }
 
+func recognizedPlaylistsPage(body string) bool {
+	return strings.Contains(body, "video-item-container") ||
+		strings.Contains(body, "single-user-playlist") ||
+		strings.Contains(body, "home-rows-videos-wrapper")
+}
+
 func (c *Client) get(ctx context.Context, path string, query url.Values) (string, error) {
 	body, err := c.getHTTP(ctx, path, c.pageURL(path, query))
 	if errors.Is(err, ErrChallenge) {
@@ -284,10 +294,9 @@ func (c *Client) pageURL(path string, query url.Values) string {
 	return raw
 }
 
-// Close releases resources held by the client. There is nothing to release
-// now that the browser fallback has been removed; it is kept so that
-// Adapter.Close can remain an io.Closer.
+// Close releases idle connections held by the client.
 func (c *Client) Close() error {
+	c.http.CloseIdleConnections()
 	return nil
 }
 

@@ -258,6 +258,22 @@ func TestAdapterFolders(t *testing.T) {
 	}
 }
 
+func TestAdapterFoldersRejectsUnexpectedPlaylistMarkup(t *testing.T) {
+	c, _ := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/":
+			_, _ = w.Write([]byte(profileFixture))
+		case "/user/1067626/playlists":
+			_, _ = w.Write([]byte("<html><body>maintenance</body></html>"))
+		default:
+			http.NotFound(w, r)
+		}
+	}, map[string]string{"hanime1_session": "session"})
+	if _, err := NewAdapter(c).ListFolders(context.Background()); err == nil {
+		t.Fatal("expected unrecognized playlist page error")
+	}
+}
+
 func TestAdapterCustomPlaylistPage(t *testing.T) {
 	c, _ := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" {
